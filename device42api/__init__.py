@@ -3,12 +3,12 @@
 import httplib2 
 import base64
 import simplejson as json
-from urllib.parse import urlencode
+from urllib import urlencode
 
 class Required(object): pass
 class Optional(object): pass
 
-class Device42APIObjectException(Exception):    pass
+class Device42APIObjectException(Exception): pass
 
 class Device42APIObject(object):
     """.. _Device42APIObject:
@@ -578,6 +578,7 @@ class Device(Device42APIObject):
         self.is_it_blade_host       = False
         self.in_service             = False
         self.type                   = Optional() # values are physical, virtual, blade, cluster, or other
+        self.virtual_subtype        = Optional()
         self.service_level          = Optional()
         self.virtual_host           = Optional()
         self.blade_host             = Optional()
@@ -660,7 +661,7 @@ class Device(Device42APIObject):
             raise Device42APIObjectException(u'required Attribute "name" not set')
         self.__get_json_validator__(('name', 'serial_no', 'asset_no', 'manufacturer', 'hardware', 'type', 'service_level', 'virtual_host', 'blade_host', 'slot_no',
                   'storage_room_id', 'storage_room', 'os', 'osver', 'memory', 'cpucount', 'cpupower', 'cpucore',
-                  'hddcount', 'hddsize', 'hddraid', 'hddraid_type', 'devices', 'appcomps',
+                  'hddcount', 'hddsize', 'hddraid', 'hddraid_type', 'devices', 'appcomps', 'virtual_subtype',
                   'customer', 'contract', 'aliases', 'notes', 'is_it_switch', 'is_it_virtual_host', 'is_it_blade_host', 'uuid'))
         return self.json
     def add_mac(self, macAddress=None, port_name=None):
@@ -744,6 +745,58 @@ class Device(Device42APIObject):
             if rsp['code'] == 0:
                 self.custom_fields.append(cf)
         return rsp
+
+class CloudDevice(Device42APIObject):
+    """.. CloudDevice:
+    
+    create Cloud Device object
+    
+    >>> api = device42api.Device42API(host='127.0.0.1', username='admin', password='changeme')
+    >>> d = device42api.CloudDevice(api=api)
+    >>> d.name = 'TestDevice'
+    >>> d.vendor = 'CloudVendor' # serial number must follow certain structure ???
+    >>> d.save()
+    {'msg': ['device added or updated', 156, 'TestDevice', True, True], 'code': 0}
+
+    """
+
+    def __init__(self, json=None, parent=None, api=None):
+        self.device                 = Required()
+        self.serial_no              = Optional()
+        self.asset_no               = Optional()
+        self.device_id              = Optional()
+        self.uuid                   = Optional()
+        self.vendor                 = Optional()
+        self.status                 = Optional()
+        self.location               = Optional()
+        self.notes                  = Optional()
+        if json != None:
+            super(CloudDevice, self).__init__(json['device'], parent, api)
+            self._json              = json
+        else:
+            super(CloudDevice, self).__init__(json, parent, api)
+            self._json              = dict()
+        self._api_path              = '1.0/device/cloud_instance/'
+
+    def save(self):
+        # print(self.get_json())
+        if self.api != None:
+            rsp = self.api.__post_api__('%s/' % self._api_path, v=None, body=self.get_json())
+            #{'msg': ['device added or updated', 3, 'Test Device 2', True, True], 'code': 0}
+            if isinstance(rsp, dict) and 'msg' in rsp:
+                if rsp['msg'][-2] == True:
+                    self.device_id  = rsp['msg'][1]
+            return rsp
+
+    def get_json(self):
+        if isinstance(self.device, Required):
+            raise Device42APIObjectException(u'required Attribute "device" not set')
+        self.__get_json_validator__(('device', 'serial_no', 'asset_no', 'device_id',
+                                     'uuid', 'vendor', 'status', 'location','notes'))
+        return self.json
+
+    def __str__(self):
+        return u'%s' % self.name
 
 class Hardware(Device42APIObject):
     """.. _Hardware:
@@ -1470,10 +1523,10 @@ class Device42API(object):
         if noInit:      return
         try:
             self.get_building()
-            self.get_customer()
-            self.get_rack()
-            self.get_room()
-            self.get_service_level()
+            # self.get_customer()
+            # self.get_rack()
+            # self.get_room()
+            # self.get_service_level()
         except Exception as e:
             print(str(e))
     def __get_api__(self, path=None):
